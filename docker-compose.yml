@@ -1,20 +1,15 @@
-version: '3.8'
-
 services:
-  # MySQL Database Service
   mysql:
     image: mysql:8.0
     container_name: todolist-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpassword}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       MYSQL_DATABASE: ${DB_NAME:-todolist}
       MYSQL_USER: ${DB_USER:-todouser}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-todopassword}
-    ports:
-      - "3306:3306"
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - todolist-network
     healthcheck:
@@ -22,9 +17,11 @@ services:
       timeout: 5s
       retries: 10
       interval: 10s
+      start_period: 30s
+    restart: unless-stopped
 
-  # Backend Service
   backend:
+    image: alishafatima797/three-tier-backend:${IMAGE_TAG:-latest}
     build:
       context: ./server
       dockerfile: Dockerfile
@@ -32,12 +29,10 @@ services:
     environment:
       DB_HOST: mysql
       DB_USER: ${DB_USER:-todouser}
-      DB_PASSWORD: ${DB_PASSWORD:-todopassword}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       DB_NAME: ${DB_NAME:-todolist}
       PORT: 8080
       NODE_ENV: production
-    ports:
-      - "8080:8080"
     depends_on:
       mysql:
         condition: service_healthy
@@ -45,23 +40,29 @@ services:
       - todolist-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:8080/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+        ]
       timeout: 5s
       retries: 10
       interval: 10s
+      start_period: 20s
 
-  # Frontend Service
   frontend:
+    image: alishafatima797/three-tier-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./client
       dockerfile: Dockerfile
     container_name: todolist-frontend
-    environment:
-      REACT_APP_API_URL: http://backend:8080
     ports:
-      - "3000:3000"
+      - "80:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - todolist-network
     restart: unless-stopped

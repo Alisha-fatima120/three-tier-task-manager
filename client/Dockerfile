@@ -1,33 +1,24 @@
-# Frontend Dockerfile - Multi-stage build
+# Stage 1: Build the React application
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install
 
-# Copy application code
 COPY . .
 
-# Build the React app
+# Send API requests through the Nginx reverse proxy
+ENV REACT_APP_API_URL=/api
+
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine
+# Stage 2: Serve the application with Nginx
+FROM nginx:alpine
 
-WORKDIR /app
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
-# Install serve to run the static files
-RUN npm install -g serve
-
-# Copy built app from builder stage
-COPY --from=builder /app/build ./build
-
-# Expose port
 EXPOSE 3000
 
-# Start the app
-CMD ["serve", "-s", "build", "-l", "3000"]
+CMD ["nginx", "-g", "daemon off;"]

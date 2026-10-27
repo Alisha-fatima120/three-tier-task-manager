@@ -1,0 +1,19 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+server/.env
+client/.env
+client/.env.*
+
+# Dependencies and build output
+node_modules/
+client/build/
+
+# Local backups
+*.backup
+*.pre-jenkins-backup
+
+# Logs
+*.log
+npm-debug.log*
