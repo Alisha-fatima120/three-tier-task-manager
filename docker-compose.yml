@@ -69,6 +69,7 @@ services:
 
 volumes:
   mysql-data:
+    name: todolist-mysql-data
     driver: local
 
 networks:
